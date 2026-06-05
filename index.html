@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#121212">
+  <title>MzimbaEduTrack - Student Achievement Portal</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <!-- Configuration and Realtime Sync -->
+  <script src="config.js"></script>
+  <script src="realtime.js"></script>
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div id="splashOverlay" class="splash-overlay">
+    <div class="splash-card">
+      <div class="splash-mark">
+        <img src="icon.png" alt="MzimbaEduTrack logo" style="width:100%;height:100%;object-fit:contain;">
+      </div>
+      <h1>MzimbaEduTrack</h1>
+      <p>Secure Student Progress Portal for Mzimba South</p>
+      <div class="splash-loader">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    
+    <!-- Top Bar with status & action items -->
+    <header class="top-header no-print">
+      <div>
+        <span class="admin-status-badge" id="adminBadge" style="display: none;">
+          <span style="display: inline-block; width: 8px; height: 8px; background-color: #ff4a6e; border-radius: 50%;"></span>
+          ADMIN ACTIVE (Zone: <span id="activeAdminZone">None</span>)
+        </span>
+        <span class="admin-status-badge" id="supabaseStatusBadge" style="display: none; margin-left: 14px;">
+          <span id="supabaseStatusIndicator" style="display: inline-block; width: 8px; height: 8px; background-color: #ccc; border-radius: 50%; margin-right: 6px;"></span>
+          <span id="supabaseStatusText">Checking Supabase...</span>
+        </span>
+      </div>
+      <div>
+        <button id="exitAdminBtn" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.75rem; display: none;" onclick="logoutAdmin()">Exit Admin</button>
+      </div>
+    </header>
+
+    <!-- Main App Brand Header -->
+    <div class="no-print" style="margin-top: 20px;">
+      <div class="logo-container">
+        <!-- Branding logo image -->
+        <img class="logo-icon" src="icon.png" alt="MzimbaEduTrack logo">
+        <h1>MzimbaEduTrack</h1>
+      </div>
+      <p class="tagline">Tracking Learner Achievement Across Mzimba South</p>
+    </div>
+
+    <!-- ========================================== -->
+    <!--          USER / VISITOR INTERFACE          -->
+    <!-- ========================================== -->
+    <main id="userPortalSection" class="glass-panel no-print">
+      <h2 style="font-size: 1.25rem; margin-bottom: 20px; text-align: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">
+        Learner Report Card Retrieval
+      </h2>
+      
+      <!-- User Query Form -->
+      <form id="cardRetrievalForm" onsubmit="handleRetrieveReport(event)">
+        <div class="grid grid-2">
+          <!-- Zone Selection -->
+          <div class="form-group">
+            <label for="userZoneSelect">Select Zone</label>
+            <select id="userZoneSelect" class="form-select" onchange="handleUserZoneChange()" required>
+              <option value="">-- Loading Zones --</option>
+            </select>
+          </div>
+
+          <!-- School Selection -->
+          <div class="form-group">
+            <label for="userSchoolSelect">Select School</label>
+            <select id="userSchoolSelect" class="form-select" onchange="handleUserSchoolChange()" required disabled>
+              <option value="">-- Select Zone First --</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <!-- Class Selection -->
+          <div class="form-group">
+            <label for="userClassSelect">Class Level</label>
+            <select id="userClassSelect" class="form-select" required>
+              <option value="">-- Select Class --</option>
+              <option value="Standard 5">Standard 5</option>
+              <option value="Standard 6">Standard 6</option>
+              <option value="Standard 7">Standard 7</option>
+              <option value="Standard 8">Standard 8</option>
+            </select>
+          </div>
+
+          <!-- LIN Input -->
+          <div class="form-group">
+            <label for="userLinInput">Learner Identification Number (LIN)</label>
+            <input type="text" id="userLinInput" class="form-input" placeholder="Enter 16-digit LIN" maxlength="16" pattern="\d{16}" required>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <!-- Year Selection -->
+          <div class="form-group">
+            <label for="userYearSelect">Academic Year</label>
+            <select id="userYearSelect" class="form-select" required>
+              <option value="">-- Select Year --</option>
+            </select>
+          </div>
+
+          <!-- Term Selection -->
+          <div class="form-group">
+            <label for="userTermSelect">Term</label>
+            <select id="userTermSelect" class="form-select" required>
+              <option value="">-- Select Term --</option>
+              <option value="Term One">Term One</option>
+              <option value="Term Two">Term Two</option>
+              <option value="Term Three">Term Three</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 15px;">
+          View Results
+        </button>
+      </form>
+    </main>
+
+    <!-- ========================================== -->
+    <!--           HIDDEN ADMIN PORTAL              -->
+    <!-- ========================================== -->
+    <main id="adminPortalSection" class="glass-panel no-print" style="display: none;">
+      <h2 style="font-size: 1.4rem; border-bottom: 2px solid var(--malawi-green); padding-bottom: 10px; margin-bottom: 20px;">
+        Admin Dashboard
+      </h2>
+
+      <!-- Navigation Tabs inside Admin Panel -->
+      <div class="dashboard-navigation">
+        <button class="tab-btn active" onclick="switchAdminTab('learnersTab')">View & Search Learners</button>
+        <button class="tab-btn" onclick="switchAdminTab('addResultsTab')">Add New Results</button>
+        <button class="tab-btn" onclick="switchAdminTab('manageSchoolsTab')">Manage Schools</button>
+      </div>
+
+      <!-- TAB 1: VIEW & SEARCH LEARNERS -->
+      <section id="learnersTab" class="view-section active">
+        <div class="form-group">
+          <input type="text" id="learnerSearchInput" class="form-input" placeholder="Search learners by name or LIN..." oninput="filterLearnersTable()">
+        </div>
+        
+        <div class="data-table-wrapper">
+          <table class="data-table" id="learnersTable">
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>LIN</th>
+                <th>Zone</th>
+                <th>School</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="learnersTableBody">
+              <!-- Dynamic rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 2: ADD RESULTS (WIZARD FLOW) -->
+      <section id="addResultsTab" class="view-section">
+        <!-- Wizard step indicators -->
+        <div class="wizard-step-indicator">
+          <div class="wizard-step-dot active" id="dot1">1. School & Class</div>
+          <div class="wizard-step-dot" id="dot2">2. Report Card Entry</div>
+          <div class="wizard-step-dot" id="dot3">3. Identity & Save</div>
+        </div>
+
+        <!-- Wizard Step 1: School & Class Selection -->
+        <div id="wizardStep1" class="wizard-steps active">
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="adminSchoolSelect">School</label>
+              <select id="adminSchoolSelect" class="form-select">
+                <option value="">-- Loading Zone Schools --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="adminClassSelect">Class Level</label>
+              <select id="adminClassSelect" class="form-select">
+                <option value="Standard 5">Standard 5</option>
+                <option value="Standard 6">Standard 6</option>
+                <option value="Standard 7">Standard 7</option>
+                <option value="Standard 8">Standard 8</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="adminYearSelect">Academic Year</label>
+              <select id="adminYearSelect" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label for="adminTermSelect">Term</label>
+              <select id="adminTermSelect" class="form-select">
+                <option value="Term One">Term One</option>
+                <option value="Term Two">Term Two</option>
+                <option value="Term Three">Term Three</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="proceedToStep2()">Next: Enter Subject Scores</button>
+        </div>
+
+        <!-- Wizard Step 2: Subject Matrix Data Entry (Excel Structure) -->
+        <div id="wizardStep2" class="wizard-steps">
+          <h3 style="font-size: 1.1rem; margin-bottom: 15px; color: var(--malawi-green);">Report Card Mark Sheets Matrix</h3>
+          <p style="font-size: 0.85rem; color: var(--glass-text-muted); margin-bottom: 12px;">Fill out coursework/exam assessment parameters for standard subjects.</p>
+          
+          <div class="results-matrix-wrapper">
+            <table class="results-matrix-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th style="width: 120px;">Continuous Asses. (Max 40)</th>
+                  <th style="width: 120px;">Terminal Exam (Max 60)</th>
+                  <th style="width: 100px;">Total (100)</th>
+                  <th style="width: 90px;">Grade</th>
+                  <th>Remarks / Comments</th>
+                </tr>
+              </thead>
+              <tbody id="matrixTableBody">
+                <!-- Hardcoded standard Malawian National Curriculum subjects -->
+                <tr data-subject="Chichewa">
+                  <td>Chichewa</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="English">
+                  <td>English</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Mathematics">
+                  <td>Mathematics</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Science and Technology">
+                  <td>Science &amp; Tech</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Social Studies">
+                  <td>Social Studies</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Agriculture">
+                  <td>Agriculture</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Life Skills">
+                  <td>Life Skills</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+                <tr data-subject="Expressive Arts">
+                  <td>Expressive Arts</td>
+                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
+                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="text" class="score-input grade-score" readonly></td>
+                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid grid-2" style="margin-bottom: 20px;">
+            <div class="form-group">
+              <label for="adminClassPosition">Class Position / Rank</label>
+              <input type="text" id="adminClassPosition" class="form-input" placeholder="e.g., 5th">
+            </div>
+            <div class="form-group">
+              <label for="adminTotalPupils">Out of (Total Pupils in Class)</label>
+              <input type="number" id="adminTotalPupils" class="form-input" placeholder="e.g., 45">
+            </div>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="adminClassTeacherComment">Class Teacher's Comments</label>
+              <input type="text" id="adminClassTeacherComment" class="form-input" placeholder="Enter teacher evaluation summary">
+            </div>
+            <div class="form-group">
+              <label for="adminHeadTeacherComment">Headteacher's Comments</label>
+              <input type="text" id="adminHeadTeacherComment" class="form-input" placeholder="Enter headteacher evaluation summary">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adminPromotionStatus">Promotion Status</label>
+            <select id="adminPromotionStatus" class="form-select">
+              <option value="N/A">Not Applicable (Mid-Year/Term)</option>
+              <option value="Promoted">Promoted to Next Standard</option>
+              <option value="Retained">Retained / Repeat Standard</option>
+              <option value="Warning">Under Observation / Warning</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 15px;">
+            <button class="btn btn-outline" onclick="goToStep(1)">Back</button>
+            <button class="btn btn-primary" onclick="proceedToStep3()">Next: Learner Verification</button>
+          </div>
+        </div>
+
+        <!-- Wizard Step 3: Learner Identification & Final Upload Save -->
+        <div id="wizardStep3" class="wizard-steps">
+          <div style="background: rgba(255,255,255,0.02); border-left: 4px solid var(--malawi-green); padding: 15px; border-radius: 4px; margin-bottom: 24px;">
+            <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 8px;">Final Steps: Learner Verification</h3>
+            <p style="font-size: 0.85rem; color: var(--glass-text-muted);">Please provide the learner's Name and 16-digit LIN. Systems will reject identical name + LIN duplicates for duplicates avoidance.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="adminLearnerName">Learner Full Name</label>
+            <input type="text" id="adminLearnerName" class="form-input" placeholder="Firstname Middlename Lastname" required>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="adminLearnerGender">Learner Gender</label>
+              <select id="adminLearnerGender" class="form-select" required>
+                <option value="">-- Select Gender --</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="adminLearnerDob">Date of Birth</label>
+              <input type="date" id="adminLearnerDob" class="form-input" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adminLearnerLin">Learner Identification Number (LIN)</label>
+            <input type="text" id="adminLearnerLin" class="form-input" placeholder="Exactly 16 numerical digits" maxlength="16" pattern="\d{16}" required>
+          </div>
+
+          <div class="grid grid-2" style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+            <div>
+              <span style="font-size: 0.8rem; color: var(--glass-text-muted); display: block;">TARGET YEAR</span>
+              <span id="labelConfirmedYear" style="font-weight: 700; color: #fff;">-</span>
+            </div>
+            <div>
+              <span style="font-size: 0.8rem; color: var(--glass-text-muted); display: block;">TARGET TERM</span>
+              <span id="labelConfirmedTerm" style="font-weight: 700; color: #fff;">-</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-outline" onclick="goToStep(2)">Back</button>
+            <button class="btn btn-primary" onclick="uploadAndSaveReportCard()">Upload &amp; Save</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: MANAGE SCHOOLS -->
+      <section id="manageSchoolsTab" class="view-section">
+        <h3 style="font-size: 1.1rem; margin-bottom: 12px;">Create New School in (<span id="schoolManageZoneLabel"></span>)</h3>
+        
+        <form id="addSchoolForm" onsubmit="handleCreateSchool(event)" style="margin-bottom: 30px;">
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="newSchoolNameInput">School Name</label>
+              <input type="text" id="newSchoolNameInput" class="form-input" placeholder="e.g., Mzimba Secondary School" required>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button type="submit" class="btn btn-primary" style="height: 48px;">Register School</button>
+            </div>
+          </div>
+        </form>
+
+        <h3 style="font-size: 1.1rem; margin-bottom: 12px;">Registered Schools List</h3>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>School Name</th>
+                <th>Assigned Education Zone</th>
+              </tr>
+            </thead>
+            <tbody id="schoolsListTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- ========================================== -->
+    <!--            RESULTS OUTPUT AREA             -->
+    <!-- ========================================== -->
+    <section id="resultsRenderArea" style="display: none;">
+      <!-- Action buttons above rendering card -->
+      <div class="no-print" style="display: flex; gap: 12px; margin-bottom: 20px;">
+        <button class="btn btn-primary" onclick="window.print()">Print Report Card (PDF)</button>
+        <button class="btn btn-outline" onclick="closeReportCardView()">Close / Go Back</button>
+      </div>
+
+      <!-- High fidelity output layout designed as custom Excel sheet -->
+      <div class="report-card-printout" id="reportCardPrintout">
+        <div class="report-card-printout-header">
+          <h2>Mzimba South District Education</h2>
+          <h3 style="font-size: 1.1rem; font-weight: 700; text-transform: uppercase; color: #222; margin-top: 4px;">Official Student Progress Report Card</h3>
+        </div>
+
+        <div class="report-card-meta-grid">
+          <div><span class="report-card-meta-label">LEARNER FULL NAME:</span> <span id="rcLearnerName">John Phiri</span></div>
+          <div><span class="report-card-meta-label">LEARNER IDENTIFICATION (LIN):</span> <span id="rcLearnerLin">1000000000000002</span></div>
+          <div><span class="report-card-meta-label">EDUCATION ZONE:</span> <span id="rcZone">CHASATO</span></div>
+          <div><span class="report-card-meta-label">SCHOOL NAME:</span> <span id="rcSchool">Chasato Primary School</span></div>
+          <div><span class="report-card-meta-label">CLASS LEVEL:</span> <span id="rcClass">Standard 6</span></div>
+          <div><span class="report-card-meta-label">ACADEMIC YEAR &amp; TERM:</span> <span id="rcYearTerm">2026 - Term One</span></div>
+        </div>
+
+        <table class="report-card-table">
+          <thead>
+            <tr>
+              <th style="width: 30%;">Subject of Study</th>
+              <th style="width: 15%; text-align: center;">CA (Max 40)</th>
+              <th style="width: 15%; text-align: center;">Exam (Max 60)</th>
+              <th style="width: 15%; text-align: center;">Total (100)</th>
+              <th style="width: 10%; text-align: center;">Grade</th>
+              <th style="width: 15%; text-align: center;">Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="rcSubjectsBody">
+            <!-- Dynamically populated from scores storage -->
+          </tbody>
+        </table>
+
+        <!-- Summary Statistics Panels -->
+        <div class="summary-card-grid">
+          <div>
+            <label>Aggregate Marks</label>
+            <span id="rcTotalMarks">0 / 800</span>
+          </div>
+          <div>
+            <label>Mean Percentage</label>
+            <span id="rcMeanPercentage">0.0%</span>
+          </div>
+          <div>
+            <label>Position in Class</label>
+            <span id="rcPosition">N/A</span>
+          </div>
+          <div>
+            <label>Promotion Status</label>
+            <span id="rcPromotion">N/A</span>
+          </div>
+        </div>
+
+        <!-- Comments & Approvals Signature Panel -->
+        <div class="comments-panel-report">
+          <p><strong>Class Teacher Comments:</strong> <span id="rcClassTeacherComment" style="font-style: italic;">No notes provided.</span></p>
+          <p><strong>Headteacher Comments:</strong> <span id="rcHeadTeacherComment" style="font-style: italic;">No notes provided.</span></p>
+          
+          <div style="margin-top: 35px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: center;">
+            <div style="border-top: 1px dashed #000; padding-top: 8px; font-size: 0.8rem; font-weight: 700;">
+              CLASS TEACHER SIGNATURE
+            </div>
+            <div style="border-top: 1px dashed #000; padding-top: 8px; font-size: 0.8rem; font-weight: 700;">
+              HEADTEACHER SIGNATURE &amp; STAMP
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!--           MODAL 1: ADMIN LOGIN             -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="adminLoginModal">
+    <div class="modal-content">
+      <h2 style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">Admin Credentials Panel</h2>
+      <p style="font-size: 0.8rem; color: var(--glass-text-muted); margin-bottom: 20px;">Please login with your secure MzimbaEduTrack credentials.</p>
+      
+      <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
+        <div class="form-group">
+          <label for="adminEmailInput">Admin Email Address</label>
+          <input type="email" id="adminEmailInput" class="form-input" placeholder="admin@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="adminPasswordInput">Admin Password</label>
+          <input type="password" id="adminPasswordInput" class="form-input" placeholder="Enter secure password" required>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('adminLoginModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!--       MODAL 2: ADMIN ZONE SELECTION        -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="adminZoneSelectModal">
+    <div class="modal-content">
+      <h2 style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">Admin Zone Access</h2>
+      <p style="font-size: 0.8rem; color: var(--glass-text-muted); margin-bottom: 20px;">Select the education administrative zone to manage.</p>
+      
+      <!-- Zone Search Field -->
+      <div class="form-group">
+        <label for="adminZoneSearchInput">Search Zone</label>
+        <input type="text" id="adminZoneSearchInput" class="form-input" placeholder="Type to filter zones..." oninput="filterAdminZones()">
+      </div>
+
+      <!-- Select field with preloaded zones -->
+      <div class="form-group">
+        <label for="adminZoneDropdown">Available Zones</label>
+        <select id="adminZoneDropdown" class="form-select" size="6" style="height: auto;">
+          <!-- Loaded via JavaScript -->
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('adminZoneSelectModal')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="proceedToZonePassword()">Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!--        MODAL 3: ZONE PASSWORD CHECK        -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="zonePasswordModal">
+    <div class="modal-content">
+      <h2 style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">Zone Authorization</h2>
+      <p style="font-size: 0.8rem; color: var(--glass-text-muted); margin-bottom: 20px;">
+        Enter secure validation password for zone: <strong id="lblTargetValidationZone" style="color: var(--malawi-green);">None</strong>.
+      </p>
+      
+      <form id="zonePasswordForm" onsubmit="handleZoneAuth(event)">
+        <div class="form-group">
+          <label for="zonePasswordInput">Zone Access Password</label>
+          <input type="password" id="zonePasswordInput" class="form-input" required>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('zonePasswordModal')">Back</button>
+          <button type="submit" class="btn btn-primary">Authorize Access</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!--      GENERIC ALERT / MESSAGE MODAL         -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="alertModal">
+    <div class="modal-content">
+      <h2 id="alertTitle" style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">Information</h2>
+      <p id="alertMessage" style="font-size: 0.9rem; color: var(--glass-text-muted); margin-bottom: 20px;">Message content</p>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn btn-primary" onclick="closeModal('alertModal')">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main scripts inclusion -->
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

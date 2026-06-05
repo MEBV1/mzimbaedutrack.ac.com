@@ -1,0 +1,68 @@
+# Cloudflare Pages Build Configuration
+# Deploy this project as a Cloudflare Pages static site
+
+[build]
+command = "echo 'No build step required for static site'"
+publish = "."
+
+[build.environment]
+# Node version (not required for static sites, but can be useful)
+NODE_VERSION = "18"
+
+# Set environment variables that will be available during build
+VITE_APP_ENV = "production"
+VITE_APP_NAME = "MzimbaEduTrack"
+VITE_APP_VERSION = "1.0.0"
+VITE_ENABLE_REALTIME = "true"
+VITE_ENABLE_DEBUG_LOGGING = "false"
+
+[build.watch_paths]
+# Rebuild when these paths change
+watch = ["**/*.html", "**/*.css", "**/*.js", "**/*.json"]
+
+[context.production]
+# Production-specific environment variables
+environment = { VITE_APP_ENV = "production" }
+
+[context.preview]
+# Preview/staging-specific environment variables
+environment = { VITE_APP_ENV = "development", VITE_ENABLE_DEBUG_LOGGING = "true" }
+
+# Routing rules
+[[redirects]]
+# Redirect root trailing slash
+from = "/*"
+to = "/"
+status = 200
+
+# Security headers
+[[headers]]
+path = "/*"
+[headers.values]
+# Prevent clickjacking
+X-Frame-Options = "SAMEORIGIN"
+# Prevent MIME sniffing
+X-Content-Type-Options = "nosniff"
+# Enable XSS filtering
+X-XSS-Protection = "1; mode=block"
+# Content Security Policy
+Content-Security-Policy = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co https://realtime.*.supabase.co"
+# Referrer policy
+Referrer-Policy = "no-referrer-when-downgrade"
+
+# Cache policy for assets
+[[headers]]
+path = "/icon*.{png,svg,webp}"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+path = "/*.{html,css,js}"
+[headers.values]
+Cache-Control = "public, max-age=3600, must-revalidate"
+
+# Configuration injection script
+[[headers]]
+path = "/"
+[headers.values]
+X-Robots-Tag = "index, follow"
