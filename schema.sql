@@ -88,16 +88,16 @@ CREATE TABLE IF NOT EXISTS results (
 
 -- 5. RESULT SUBJECTS TABLE
 CREATE TABLE IF NOT EXISTS result_subjects (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    result_id UUID NOT NULL REFERENCES results(id) ON DELETE CASCADE,
-    subject_name VARCHAR(100) NOT NULL,
-    ca_mark NUMERIC(5, 2) NOT NULL CHECK (ca_mark BETWEEN 0 AND 40),
-    exam_mark NUMERIC(5, 2) NOT NULL CHECK (exam_mark BETWEEN 0 AND 60),
-    mark NUMERIC(5, 2) NOT NULL CHECK (mark BETWEEN 0 AND 100),
-    grade VARCHAR(2) NOT NULL,
-    remarks TEXT DEFAULT '',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_result_subject UNIQUE (result_id, subject_name)
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  result_id UUID NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+  subject_name VARCHAR(100) NOT NULL,
+  ca_mark NUMERIC(5, 2) DEFAULT 0,
+  exam_mark NUMERIC(5, 2) NOT NULL CHECK (exam_mark BETWEEN 0 AND 100),
+  mark NUMERIC(5, 2) NOT NULL CHECK (mark BETWEEN 0 AND 100),
+  grade VARCHAR(2) NOT NULL,
+  remarks TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_result_subject UNIQUE (result_id, subject_name)
 );
 
 -- 6. RESULT VERSIONS (AUDIT LOG) TABLE

@@ -601,7 +601,7 @@ function resetWizard() {
   // Clear Matrix Input fields
   document.querySelectorAll(".score-input").forEach(inp => {
     if (!inp.readOnly) inp.value = "";
-    else if (inp.classList.contains("total-score") || inp.classList.contains("grade-score")) inp.value = "";
+    else if (inp.classList.contains("grade-score")) inp.value = "";
   });
   document.querySelectorAll(".remarks-score").forEach(inp => inp.value = "");
   
@@ -650,33 +650,23 @@ function proceedToStep3() {
  */
 function calculateRow(inputElement) {
   const tr = inputElement.closest("tr");
-  const caInput = tr.querySelector(".ca-score");
   const examInput = tr.querySelector(".exam-score");
-  const totalInput = tr.querySelector(".total-score");
   const gradeInput = tr.querySelector(".grade-score");
 
-  let ca = parseFloat(caInput.value) || 0;
   let exam = parseFloat(examInput.value) || 0;
 
   // Validation boundaries
-  if (ca > 40) {
-    ca = 40;
-    caInput.value = 40;
+  if (exam > 100) {
+    exam = 100;
+    examInput.value = 100;
   }
-  if (exam > 60) {
-    exam = 60;
-    examInput.value = 60;
-  }
-
-  const total = ca + exam;
-  totalInput.value = total;
 
   // Compute standard Malawian performance grades
   let grade = "F";
-  if (total >= 80) grade = "A";
-  else if (total >= 70) grade = "B";
-  else if (total >= 60) grade = "C";
-  else if (total >= 50) grade = "D";
+  if (exam >= 80) grade = "A";
+  else if (exam >= 70) grade = "B";
+  else if (exam >= 60) grade = "C";
+  else if (exam >= 50) grade = "D";
 
   gradeInput.value = grade;
 }
@@ -690,13 +680,11 @@ function compileSubjectScores() {
   
   rows.forEach(tr => {
     const subject = tr.getAttribute("data-subject");
-    const ca = parseFloat(tr.querySelector(".ca-score").value) || 0;
     const exam = parseFloat(tr.querySelector(".exam-score").value) || 0;
-    const total = parseFloat(tr.querySelector(".total-score").value) || 0;
     const grade = tr.querySelector(".grade-score").value || "F";
     const remarks = tr.querySelector(".remarks-score").value.trim();
 
-    scores[subject] = { ca, exam, total, grade, remarks };
+    scores[subject] = { exam, total: exam, grade, remarks };
   });
 
   return scores;
@@ -728,31 +716,14 @@ function validateReportCardData() {
   let hasScoreEntry = false;
 
   for (const tr of rows) {
-    const caField = tr.querySelector(".ca-score");
     const examField = tr.querySelector(".exam-score");
-    const totalField = tr.querySelector(".total-score");
 
-    const caValue = caField?.value.trim();
     const examValue = examField?.value.trim();
-    const totalValue = totalField?.value.trim();
-
-    if (caValue !== "" || examValue !== "") {
-      hasScoreEntry = true;
-    }
-
-    if (caValue !== "") {
-      const ca = Number(caValue);
-      if (!Number.isFinite(ca) || ca < 0 || ca > 40) return false;
-    }
 
     if (examValue !== "") {
+      hasScoreEntry = true;
       const exam = Number(examValue);
-      if (!Number.isFinite(exam) || exam < 0 || exam > 60) return false;
-    }
-
-    if (totalValue !== "") {
-      const total = Number(totalValue);
-      if (!Number.isFinite(total) || total < 0 || total > 100) return false;
+      if (!Number.isFinite(exam) || exam < 0 || exam > 100) return false;
     }
   }
 
@@ -978,15 +949,13 @@ function renderReportCardToUI(report) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="font-weight:700;">${subject}</td>
-      <td style="text-align: center;">${data.ca}</td>
-      <td style="text-align: center;">${data.exam}</td>
-      <td style="text-align: center; font-weight:700;">${data.total}</td>
+      <td style="text-align: center; font-weight:700;">${data.exam}</td>
       <td style="text-align: center; font-weight:700;">${data.grade}</td>
       <td>${data.remarks || "-"}</td>
     `;
     tbody.appendChild(tr);
 
-    aggregateTotal += data.total;
+    aggregateTotal += data.exam;
     count++;
   }
 

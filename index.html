@@ -227,9 +227,7 @@
               <thead>
                 <tr>
                   <th>Subject</th>
-                  <th style="width: 120px;">Continuous Asses. (Max 40)</th>
-                  <th style="width: 120px;">Terminal Exam (Max 60)</th>
-                  <th style="width: 100px;">Total (100)</th>
+                  <th style="width: 120px;">Terminal Exam (Max 100)</th>
                   <th style="width: 90px;">Grade</th>
                   <th>Remarks / Comments</th>
                 </tr>
@@ -238,65 +236,49 @@
                 <!-- Hardcoded standard Malawian National Curriculum subjects -->
                 <tr data-subject="Chichewa">
                   <td>Chichewa</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="English">
                   <td>English</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Mathematics">
                   <td>Mathematics</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Science and Technology">
                   <td>Science &amp; Tech</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Social Studies">
                   <td>Social Studies</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Agriculture">
                   <td>Agriculture</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Life Skills">
                   <td>Life Skills</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
                 <tr data-subject="Expressive Arts">
                   <td>Expressive Arts</td>
-                  <td><input type="number" min="0" max="40" class="score-input ca-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" min="0" max="60" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="number" class="score-input total-score" readonly></td>
+                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
@@ -454,12 +436,10 @@
         <table class="report-card-table">
           <thead>
             <tr>
-              <th style="width: 30%;">Subject of Study</th>
-              <th style="width: 15%; text-align: center;">CA (Max 40)</th>
-              <th style="width: 15%; text-align: center;">Exam (Max 60)</th>
-              <th style="width: 15%; text-align: center;">Total (100)</th>
+              <th style="width: 40%;">Subject of Study</th>
+              <th style="width: 20%; text-align: center;">Terminal Exam (Max 100)</th>
               <th style="width: 10%; text-align: center;">Grade</th>
-              <th style="width: 15%; text-align: center;">Remarks</th>
+              <th style="width: 20%; text-align: center;">Remarks</th>
             </tr>
           </thead>
           <tbody id="rcSubjectsBody">

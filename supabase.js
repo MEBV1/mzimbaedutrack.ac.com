@@ -339,9 +339,9 @@ const EduTrackDB = {
 
     const subjectRows = Object.entries(subjectScores).map(([subject, score]) => ({
       subject_name: subject,
-      ca_mark: Number(score.ca || 0),
+      ca_mark: 0,
       exam_mark: Number(score.exam || 0),
-      mark: Number(score.total || 0),
+      mark: Number(score.exam || 0),
       grade: score.grade || 'F',
       remarks: score.remarks || ''
     }));
