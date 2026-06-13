@@ -146,6 +146,8 @@
         <button class="tab-btn active" onclick="switchAdminTab('learnersTab')">View & Search Learners</button>
         <button class="tab-btn" onclick="switchAdminTab('addResultsTab')">Add New Results</button>
         <button class="tab-btn" onclick="switchAdminTab('manageSchoolsTab')">Manage Schools</button>
+        <button class="tab-btn" id="manageAdminsTabBtn" style="display: none;" onclick="switchAdminTab('manageAdminsTab')">Manage Admins</button>
+        <button class="tab-btn" id="auditLogsTabBtn" style="display: none;" onclick="switchAdminTab('auditLogsTab')">Audit Logs</button>
       </div>
 
       <!-- TAB 1: VIEW & SEARCH LEARNERS -->
@@ -234,14 +236,14 @@
               </thead>
               <tbody id="matrixTableBody">
                 <!-- Hardcoded standard Malawian National Curriculum subjects -->
-                <tr data-subject="Chichewa">
-                  <td>Chichewa</td>
+                <tr data-subject="English">
+                  <td>English</td>
                   <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
-                <tr data-subject="English">
-                  <td>English</td>
+                <tr data-subject="Chichewa">
+                  <td>Chichewa</td>
                   <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
@@ -252,32 +254,20 @@
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
-                <tr data-subject="Science and Technology">
-                  <td>Science &amp; Tech</td>
+                <tr data-subject="Primary Science">
+                  <td>Primary Science</td>
                   <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
-                <tr data-subject="Social Studies">
-                  <td>Social Studies</td>
+                <tr data-subject="Social and Economic Studies">
+                  <td>Social &amp; Economic Studies</td>
                   <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
                 </tr>
-                <tr data-subject="Agriculture">
-                  <td>Agriculture</td>
-                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="text" class="score-input grade-score" readonly></td>
-                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
-                </tr>
-                <tr data-subject="Life Skills">
-                  <td>Life Skills</td>
-                  <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
-                  <td><input type="text" class="score-input grade-score" readonly></td>
-                  <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
-                </tr>
-                <tr data-subject="Expressive Arts">
-                  <td>Expressive Arts</td>
+                <tr data-subject="Arts/Life Skills">
+                  <td>Arts/Life Skills</td>
                   <td><input type="number" min="0" max="100" class="score-input exam-score" oninput="calculateRow(this)"></td>
                   <td><input type="text" class="score-input grade-score" readonly></td>
                   <td><input type="text" class="form-input remarks-score" placeholder="Remarks"></td>
@@ -346,8 +336,6 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="adminLearnerDob">Date of Birth</label>
-              <input type="date" id="adminLearnerDob" class="form-input" required>
             </div>
           </div>
 
@@ -405,6 +393,72 @@
           </table>
         </div>
       </section>
+
+      <!-- TAB 4: MANAGE ADMINS (SUPER ADMIN ONLY) -->
+      <section id="manageAdminsTab" class="view-section">
+        <h3 style="font-size: 1.1rem; margin-bottom: 12px;">Add New Admin</h3>
+        <form id="addAdminForm" onsubmit="handleAddAdmin(event)" style="margin-bottom: 30px;">
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="newAdminEmail">Admin Email</label>
+              <input type="email" id="newAdminEmail" class="form-input" placeholder="admin@example.com" required>
+            </div>
+            <div class="form-group">
+              <label for="newAdminName">Full Name</label>
+              <input type="text" id="newAdminName" class="form-input" placeholder="John Doe" required>
+            </div>
+          </div>
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label for="newAdminRole">Role</label>
+              <select id="newAdminRole" class="form-select">
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button type="submit" class="btn btn-primary" style="height: 48px;">Add Admin</button>
+            </div>
+          </div>
+        </form>
+
+        <h3 style="font-size: 1.1rem; margin-bottom: 12px;">Admins List</h3>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 5: AUDIT LOGS (SUPER ADMIN ONLY) -->
+      <section id="auditLogsTab" class="view-section">
+        <h3 style="font-size: 1.1rem; margin-bottom: 12px;">Audit Logs</h3>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Table</th>
+                <th>Date/Time</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <!-- ========================================== -->
@@ -451,7 +505,7 @@
         <div class="summary-card-grid">
           <div>
             <label>Aggregate Marks</label>
-            <span id="rcTotalMarks">0 / 800</span>
+            <span id="rcTotalMarks">0 / 600</span>
           </div>
           <div>
             <label>Mean Percentage</label>

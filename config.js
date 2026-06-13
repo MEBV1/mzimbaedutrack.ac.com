@@ -1,111 +1,58 @@
 /**
- * config.js - Centralized Configuration Management
- * Loads environment variables and provides configuration access
- * Supports both browser (via window._env_) and Node.js environments
+ * MzimbaEduTrack Configuration System
+ * Centralized configuration management
  */
 
-class ConfigManager {
-  constructor() {
-    this.config = {};
-    this.isInitialized = false;
-  }
+const Config = {
+    _config: null,
 
-  /**
-   * Initialize configuration from environment variables
-   * In production, environment variables are injected at build/deploy time
-   * For local development, use .env.local file with a build tool or manual injection
-   */
-  initialize() {
-    if (this.isInitialized) return;
+    getSupabaseConfig() {
+        if (this._config) {
+            return this._config;
+        }
 
-    // Check for window._env_ (set by build process or server)
-    const envVars = window._env_ || {};
+        // Try window._env_ first (Cloudflare Pages injection)
+        let url = '';
+        let anonKey = '';
 
-    // Fallback to direct environment variables if available
-    this.config = {
-      // Supabase Configuration
-      supabaseUrl: envVars.VITE_SUPABASE_URL || localStorage.getItem('supabase_url') || 'https://lmunhmfajpjqdegdhxok.supabase.co',
-      supabaseAnonKey: envVars.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtdW5obWZhanBqcWRlZ2RoeG9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjY0MTgsImV4cCI6MjA5NjI0MjQxOH0.YR3ySoiwEcQ_aAOBykZcRWT_Ht8cO5loJT43DYr-ExI',
+        if (typeof window !== 'undefined' && window._env_) {
+            url = window._env_.VITE_SUPABASE_URL || '';
+            anonKey = window._env_.VITE_SUPABASE_ANON_KEY || '';
+        }
 
-      // Application Configuration
-      appEnv: envVars.VITE_APP_ENV || 'production',
-      appName: envVars.VITE_APP_NAME || 'MzimbaEduTrack',
-      appVersion: envVars.VITE_APP_VERSION || '1.0.0',
+        // Fallback to localStorage for development
+        if (!url || !anonKey) {
+            url = localStorage.getItem('VITE_SUPABASE_URL') || '';
+            anonKey = localStorage.getItem('VITE_SUPABASE_ANON_KEY') || '';
+        }
 
-      // Feature Flags
-      enableRealtime: (envVars.VITE_ENABLE_REALTIME || 'true').toLowerCase() === 'true',
-      enableOfflineMode: (envVars.VITE_ENABLE_OFFLINE_MODE || 'false').toLowerCase() === 'true',
-      enableDebugLogging: (envVars.VITE_ENABLE_DEBUG_LOGGING || 'false').toLowerCase() === 'true',
+        // Final fallback: hardcoded new credentials for local dev
+        if (!url || !anonKey) {
+            url = 'https://wvsnmgzisrhneoeuwrtn.supabase.co';
+            anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2c25tZ3ppc3JobmVvZXV3cnRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODAzMTksImV4cCI6MjA5Njg1NjMxOX0.OficIVapN0PgSrTFevM5O55sTR9YLNXz-nRvTjVltwM';
+        }
 
-      // Deployment
-      deployUrl: envVars.VITE_DEPLOY_URL || '',
-    };
+        this._config = {
+            url,
+            anonKey,
+            enableRealtime: true,
+            enableDebug: false
+        };
 
-    // Validate critical configuration
-    if (!this.config.supabaseUrl || !this.config.supabaseAnonKey) {
-      console.warn('⚠️ Supabase configuration incomplete. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+        return this._config;
+    },
+
+    setConfig(key, value) {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(key, value);
+            this._config = null; // Clear cache
+        }
+    },
+
+    isDevelopment() {
+        return window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1';
     }
-
-    this.isInitialized = true;
-  }
-
-  /**
-   * Get a configuration value
-   */
-  get(key, defaultValue = undefined) {
-    if (!this.isInitialized) this.initialize();
-    return this.config[key] !== undefined ? this.config[key] : defaultValue;
-  }
-
-  /**
-   * Set a configuration value (for runtime changes)
-   */
-  set(key, value) {
-    this.config[key] = value;
-  }
-
-  /**
-   * Check if running in development mode
-   */
-  isDevelopment() {
-    return this.get('appEnv') === 'development';
-  }
-
-  /**
-   * Check if running in production mode
-   */
-  isProduction() {
-    return this.get('appEnv') === 'production';
-  }
-
-  /**
-   * Log a debug message if debug logging is enabled
-   */
-  debug(message, data = {}) {
-    if (this.get('enableDebugLogging')) {
-      console.log(`[${this.get('appName')}] ${message}`, data);
-    }
-  }
-
-  /**
-   * Get Supabase configuration object
-   */
-  getSupabaseConfig() {
-    return {
-      url: this.get('supabaseUrl'),
-      anonKey: this.get('supabaseAnonKey'),
-    };
-  }
-}
-
-// Create and export singleton instance
-const Config = new ConfigManager();
-
-// Initialize on load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => Config.initialize());
-} else {
-  Config.initialize();
-}
+};
 
 window.Config = Config;

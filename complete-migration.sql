@@ -1,19 +1,24 @@
--- Enable UUID extension
+-- ==========================================
+-- MzimbaEduTrack Complete Database Migration
+-- Creates all required tables, columns, functions, indexes, and constraints
+-- ==========================================
+
+-- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 1. ADMINS TABLE
+-- 1. Create admins table
 CREATE TABLE IF NOT EXISTS admins (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT,
     full_name VARCHAR(255),
-    role VARCHAR(50) DEFAULT 'Zone Officer',
+    role VARCHAR(50) DEFAULT 'admin',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. ZONES TABLE
+-- 2. Create zones table
 CREATE TABLE IF NOT EXISTS zones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     zone_name VARCHAR(100) NOT NULL UNIQUE,
@@ -23,7 +28,7 @@ CREATE TABLE IF NOT EXISTS zones (
     is_deleted BOOLEAN DEFAULT FALSE
 );
 
--- 3. SCHOOLS TABLE
+-- 3. Create schools table
 CREATE TABLE IF NOT EXISTS schools (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     zone_id UUID NOT NULL REFERENCES zones(id) ON DELETE RESTRICT,
@@ -35,7 +40,7 @@ CREATE TABLE IF NOT EXISTS schools (
     CONSTRAINT unique_school_per_zone UNIQUE (zone_id, school_name)
 );
 
--- 4. LEARNERS TABLE
+-- 4. Create learners table
 CREATE TABLE IF NOT EXISTS learners (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     zone_id UUID NOT NULL REFERENCES zones(id) ON DELETE RESTRICT,
@@ -47,11 +52,10 @@ CREATE TABLE IF NOT EXISTS learners (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,
-    CONSTRAINT unique_learner_lin UNIQUE (lin),
-    CONSTRAINT unique_learner_name_lin UNIQUE (full_name, lin)
+    CONSTRAINT unique_learner_lin UNIQUE (lin)
 );
 
--- 5. RESULTS TABLE
+-- 5. Create results table
 CREATE TABLE IF NOT EXISTS results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     learner_id UUID NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
@@ -59,6 +63,7 @@ CREATE TABLE IF NOT EXISTS results (
     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE RESTRICT,
     year INTEGER NOT NULL CHECK (year BETWEEN 2026 AND 2080),
     term INTEGER NOT NULL CHECK (term BETWEEN 1 AND 3),
+    class VARCHAR(60) NOT NULL,
     aggregate_marks NUMERIC(6, 2) DEFAULT 0.00,
     overall_percentage NUMERIC(5, 2) DEFAULT 0.00,
     overall_position VARCHAR(50) DEFAULT 'N/A',
@@ -76,7 +81,7 @@ CREATE TABLE IF NOT EXISTS results (
     CONSTRAINT unique_learner_year_term UNIQUE (learner_id, year, term)
 );
 
--- 6. RESULT_SUBJECTS TABLE
+-- 6. Create result_subjects table
 CREATE TABLE IF NOT EXISTS result_subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     result_id UUID NOT NULL REFERENCES results(id) ON DELETE CASCADE,
@@ -89,7 +94,7 @@ CREATE TABLE IF NOT EXISTS result_subjects (
     CONSTRAINT unique_result_subject UNIQUE (result_id, subject_name)
 );
 
--- 7. AUDIT_LOGS TABLE
+-- 7. Create audit_logs table
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
@@ -101,7 +106,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- INDEXES FOR PERFORMANCE
+-- 8. Create indexes
 CREATE INDEX IF NOT EXISTS idx_schools_zone ON schools(zone_id);
 CREATE INDEX IF NOT EXISTS idx_schools_not_deleted ON schools(id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_learners_school ON learners(school_id);
@@ -112,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_results_year_term ON results(year, term);
 CREATE INDEX IF NOT EXISTS idx_results_not_deleted ON results(id) WHERE is_deleted = FALSE;
 CREATE INDEX IF NOT EXISTS idx_result_subjects_result ON result_subjects(result_id);
 
--- 8. CALCULATION FUNCTIONS
+-- 9. Create calculate_grade function
 CREATE OR REPLACE FUNCTION calculate_grade(mark NUMERIC)
 RETURNS VARCHAR(2) LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
@@ -125,6 +130,7 @@ BEGIN
 END;
 $$;
 
+-- 10. Create update_result_aggregates trigger function
 CREATE OR REPLACE FUNCTION update_result_aggregates()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -163,13 +169,13 @@ BEGIN
 END;
 $$;
 
--- 9. TRIGGERS
+-- 11. Create trigger for result_subjects
 DROP TRIGGER IF EXISTS trigger_update_result_aggregates ON result_subjects;
 CREATE TRIGGER trigger_update_result_aggregates
 AFTER INSERT OR UPDATE OR DELETE ON result_subjects
 FOR EACH ROW EXECUTE FUNCTION update_result_aggregates();
 
--- 10. ZONE PASSWORD VALIDATION
+-- 12. Create validate_zone_password RPC function
 CREATE OR REPLACE FUNCTION validate_zone_password(zone_name TEXT, password TEXT)
 RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -177,14 +183,15 @@ DECLARE
 BEGIN
     SELECT zone_password INTO stored_password
     FROM zones
-    WHERE zone_name = $1 AND is_deleted = FALSE
+    WHERE zones.zone_name = validate_zone_password.zone_name 
+      AND zones.is_deleted = FALSE
     LIMIT 1;
 
-    RETURN stored_password = $2;
+    RETURN stored_password = validate_zone_password.password;
 END;
 $$;
 
--- 11. REPORT CARD RETRIEVAL
+-- 13. Create fetch_report_card RPC function
 CREATE OR REPLACE FUNCTION fetch_report_card(
     p_zone_name TEXT,
     p_school_id UUID,
@@ -305,7 +312,7 @@ BEGIN
 END;
 $$;
 
--- ENABLE ROW LEVEL SECURITY
+-- 14. Enable Row Level Security (RLS) on all tables
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE zones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
@@ -314,16 +321,12 @@ ALTER TABLE results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE result_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- RLS POLICIES
--- Admins policies
-DROP POLICY IF EXISTS "Allow authenticated admins select" ON admins;
-CREATE POLICY "Allow authenticated admins select" ON admins
-    FOR SELECT USING (auth.role() = 'authenticated');
+-- 15. Create RLS policies
 
 -- Zones policies
 DROP POLICY IF EXISTS "Allow public select zones" ON zones;
 CREATE POLICY "Allow public select zones" ON zones
-    FOR SELECT USING (TRUE);
+    FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow authenticated admins all zones" ON zones;
 CREATE POLICY "Allow authenticated admins all zones" ON zones
     FOR ALL USING (auth.role() = 'authenticated');
@@ -331,7 +334,7 @@ CREATE POLICY "Allow authenticated admins all zones" ON zones
 -- Schools policies
 DROP POLICY IF EXISTS "Allow public select schools" ON schools;
 CREATE POLICY "Allow public select schools" ON schools
-    FOR SELECT USING (is_deleted = FALSE);
+    FOR SELECT USING (is_deleted = false);
 DROP POLICY IF EXISTS "Allow authenticated admins all schools" ON schools;
 CREATE POLICY "Allow authenticated admins all schools" ON schools
     FOR ALL USING (auth.role() = 'authenticated');
@@ -339,7 +342,7 @@ CREATE POLICY "Allow authenticated admins all schools" ON schools
 -- Learners policies
 DROP POLICY IF EXISTS "Allow public select learners" ON learners;
 CREATE POLICY "Allow public select learners" ON learners
-    FOR SELECT USING (is_deleted = FALSE);
+    FOR SELECT USING (is_deleted = false);
 DROP POLICY IF EXISTS "Allow authenticated admins all learners" ON learners;
 CREATE POLICY "Allow authenticated admins all learners" ON learners
     FOR ALL USING (auth.role() = 'authenticated');
@@ -347,7 +350,7 @@ CREATE POLICY "Allow authenticated admins all learners" ON learners
 -- Results policies
 DROP POLICY IF EXISTS "Allow public select results" ON results;
 CREATE POLICY "Allow public select results" ON results
-    FOR SELECT USING (is_deleted = FALSE);
+    FOR SELECT USING (is_deleted = false);
 DROP POLICY IF EXISTS "Allow authenticated admins all results" ON results;
 CREATE POLICY "Allow authenticated admins all results" ON results
     FOR ALL USING (auth.role() = 'authenticated');
@@ -355,7 +358,7 @@ CREATE POLICY "Allow authenticated admins all results" ON results
 -- Result subjects policies
 DROP POLICY IF EXISTS "Allow public select result subjects" ON result_subjects;
 CREATE POLICY "Allow public select result subjects" ON result_subjects
-    FOR SELECT USING (TRUE);
+    FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow authenticated admins all result subjects" ON result_subjects;
 CREATE POLICY "Allow authenticated admins all result subjects" ON result_subjects
     FOR ALL USING (auth.role() = 'authenticated');
@@ -367,3 +370,38 @@ CREATE POLICY "Allow authenticated admins select audit logs" ON audit_logs
 DROP POLICY IF EXISTS "Allow authenticated admins insert audit logs" ON audit_logs;
 CREATE POLICY "Allow authenticated admins insert audit logs" ON audit_logs
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- 16. Insert default zones
+INSERT INTO zones (zone_name, zone_password)
+VALUES
+    ('CHASATO', 'CHASATO001'),
+    ('CHIKANGAWA', 'CHIKANGAWA002'),
+    ('CHIZUNGU', 'CHIZUNGU003'),
+    ('EDINGENI', 'EDINGENI004'),
+    ('EMFENI', 'EMFENI005'),
+    ('ENDINDENI', 'ENDINDENI006'),
+    ('EPHANGWENI', 'EPHANGWENI007'),
+    ('KABENA', 'KABENA008'),
+    ('KABUWA', 'KABUWA009'),
+    ('KANJUCHI', 'KANJUCHI010'),
+    ('KAPHUTA', 'KAPHUTA011'),
+    ('KAPOLI', 'KAPOLI012'),
+    ('KATETE', 'KATETE013'),
+    ('KAVUULA', 'KAVUULA014'),
+    ('KAZINGILIRA', 'KAZINGILIRA015'),
+    ('LUVIRI', 'LUVIRI016'),
+    ('LUWEREZI', 'LUWEREZI017'),
+    ('MABIRI', 'MABIRI018'),
+    ('MACHELECHETE', 'MACHELECHETE019'),
+    ('MANYAMULA', 'MANYAMULA020'),
+    ('MHARAUNDA', 'MHARAUNDA021'),
+    ('MPHONGO', 'MPHONGO022'),
+    ('MZOMA', 'MZOMA023'),
+    ('UNYOLO', 'UNYOLO024'),
+    ('VAZALA', 'VAZALA025'),
+    ('VIBANGALALA', 'VIBANGALALA026')
+ON CONFLICT (zone_name) DO NOTHING;
+
+-- ==========================================
+-- Migration Complete!
+-- ==========================================

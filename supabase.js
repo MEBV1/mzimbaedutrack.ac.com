@@ -1,727 +1,547 @@
 /**
- * supabase.js - Enhanced Supabase Database Abstraction Layer
- * Centralized database operations with soft-delete support and edit functionality
- * Uses Config system for secure credential management
+ * MzimbaEduTrack Database Layer
+ * Complete Supabase integration
  */
 
+// List of all zones
 const ZONE_NAMES = [
-  'CHASATO', 'CHIKANGAWA', 'CHIZUNGU', 'EDINGENI', 'EMFENI', 'ENDINDENI', 'EPHANGWENI',
-  'KABENA', 'KABUWA', 'KANJUCHI', 'KAPHUTA', 'KAPOLI', 'KATETE', 'KAVUULA', 'KAZINGILIRA',
-  'LUVIRI', 'LUWEREZI', 'MABIRI', 'MACHELECHETE', 'MANYAMULA', 'MHARAUNDA', 'MPHONGO',
-  'MZOMA', 'UNYOLO', 'VAZALA', 'VIBANGALALA'
+    'CHASATO', 'CHIKANGAWA', 'CHIZUNGU', 'EDINGENI', 'EMFENI', 'ENDINDENI',
+    'EPHANGWENI', 'KABENA', 'KABUWA', 'KANJUCHI', 'KAPHUTA', 'KAPOLI',
+    'KATETE', 'KAVUULA', 'KAZINGILIRA', 'LUVIRI', 'LUWEREZI', 'MABIRI',
+    'MACHELECHETE', 'MANYAMULA', 'MHARAUNDA', 'MPHONGO', 'MZOMA', 'UNYOLO',
+    'VAZALA', 'VIBANGALALA'
 ];
 
+// List of all report subjects
+const REPORT_SUBJECTS = [
+    'English',
+    'Chichewa',
+    'Mathematics',
+    'Primary Science',
+    'Social and Economic Studies',
+    'Arts/Life Skills'
+];
+
+// Supabase client instance
 let supabaseClient = null;
 
-/**
- * Initialize Supabase client with configuration from Config system
- */
+// Initialize Supabase client
 function initializeSupabaseClient() {
-  if (supabaseClient) return supabaseClient;
-
-  const config = Config.getSupabaseConfig();
-
-  if (!config.url || !config.anonKey) {
-    console.error('❌ Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-    return null;
-  }
-
-  const { createClient } = window.supabase || {};
-  if (typeof createClient !== 'function') {
-    console.error('❌ Supabase library not loaded. Ensure supabase-js is included in HTML');
-    return null;
-  }
-
-  supabaseClient = createClient(config.url, config.anonKey);
-  console.log('✓ Supabase client initialized successfully');
-
-  // Initialize realtime after client is ready
-  if (typeof Realtime !== 'undefined') {
-    Realtime.initialize(supabaseClient).catch((err) => {
-      console.warn('Realtime initialization failed:', err);
-    });
-  }
-
-  return supabaseClient;
-}
-
-/**
- * Utility: Normalize text input
- */
-function normalizeText(value) {
-  return String(value || '').trim();
-}
-
-/**
- * Utility: Parse full name into first and last name
- */
-function parseFullName(fullName) {
-  const parts = normalizeText(fullName).split(/\s+/).filter(Boolean);
-  return {
-    first_name: parts[0] || '',
-    last_name: parts.slice(1).join(' ') || parts[0] || ''
-  };
-}
-
-/**
- * Utility: Compute grade from average
- */
-function computeGradeFromAverage(value) {
-  if (value >= 80) return 'A';
-  if (value >= 70) return 'B';
-  if (value >= 60) return 'C';
-  if (value >= 50) return 'D';
-  return 'F';
-}
-
-/**
- * Utility: Ensure valid term (1, 2, or 3)
- */
-function ensureValidTerm(term) {
-  const parsedTerm = parseInt(term, 10);
-  if (![1, 2, 3].includes(parsedTerm)) {
-    throw new Error('Invalid term selected');
-  }
-  return parsedTerm;
-}
-
-/**
- * Get zone by name
- */
-async function getZoneByName(zoneName) {
-  const client = initializeSupabaseClient();
-  if (!client) return null;
-
-  const { data, error } = await client
-    .from('zones')
-    .select('id,name')
-    .eq('name', normalizeText(zoneName))
-    .single();
-
-  if (error && error.code !== 'PGRST116') {
-    throw error;
-  }
-  return data || null;
-}
-
-/**
- * Initialize database and verify schema
- */
-async function initializeDatabase() {
-  const client = initializeSupabaseClient();
-  if (!client) {
-    console.warn('⚠️ Database initialization skipped: Supabase not configured');
-    return;
-  }
-
-  try {
-    const { error } = await client.from('zones').select('id').limit(1);
-    if (error) {
-      console.warn('⚠️ Unable to access zones table. Confirm schema is deployed.', error);
-    } else {
-      console.log('✓ Database schema verified');
+    if (supabaseClient) {
+        return supabaseClient;
     }
-  } catch (err) {
-    console.error('❌ Database initialization error:', err);
-  }
+
+    const config = Config.getSupabaseConfig();
+
+    if (!config.url || !config.anonKey) {
+        console.warn('Supabase configuration missing');
+        return null;
+    }
+
+    const { createClient } = window.supabase || {};
+    if (typeof createClient !== 'function') {
+        console.error('Supabase library not loaded');
+        return null;
+    }
+
+    supabaseClient = createClient(config.url, config.anonKey);
+    console.log('✓ Supabase client initialized');
+
+    // Initialize realtime
+    if (typeof Realtime !== 'undefined' && config.enableRealtime) {
+        Realtime.initialize(supabaseClient);
+    }
+
+    return supabaseClient;
 }
 
-/**
- * EduTrackDB - Main database abstraction layer
- */
+// Calculate grade from mark
+function calculateGrade(mark) {
+    if (mark >= 80) return 'A';
+    if (mark >= 70) return 'B';
+    if (mark >= 60) return 'C';
+    if (mark >= 50) return 'D';
+    return 'F';
+}
+
+// Parse term string to number
+function parseTerm(termString) {
+    if (termString === 'Term One') return 1;
+    if (termString === 'Term Two') return 2;
+    if (termString === 'Term Three') return 3;
+    const parsed = parseInt(termString, 10);
+    if ([1, 2, 3].includes(parsed)) return parsed;
+    return null;
+}
+
+// Main database operations
 const EduTrackDB = {
-  /**
-   * Sign in admin user
-   */
-  async signInAdmin(email, password) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
+    ZONE_NAMES,
+    REPORT_SUBJECTS,
 
-    const { data: authData, error: authError } = await client.auth.signInWithPassword({
-      email: normalizeText(email).toLowerCase(),
-      password
-    });
+    async checkConnection() {
+        const client = initializeSupabaseClient();
+        if (!client) return false;
 
-    if (authError) throw authError;
+        try {
+            const { error } = await client.from('zones').select('id').limit(1);
+            return !error;
+        } catch (err) {
+            console.error('Connection check failed:', err);
+            return false;
+        }
+    },
 
-    const userEmail = authData?.user?.email;
-    if (!userEmail) throw new Error('Admin authentication failed.');
+    async signInAdmin(email, password) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
 
-    const { data: adminData, error: adminError } = await client
-      .from('admins')
-      .select('id,email,role')
-      .eq('email', userEmail)
-      .single();
+        const { data: authData, error: authError } = await client.auth.signInWithPassword({
+            email,
+            password
+        });
 
-    if (adminError || !adminData) {
-      await client.auth.signOut();
-      throw new Error('Admin account is not authorized.');
+        console.log('signInAdmin - authError:', authError);
+        console.log('signInAdmin - authenticated user email:', authData?.user?.email);
+
+        if (authError) {
+            console.log('signInAdmin - throwing authError:', authError);
+            throw authError;
+        }
+
+        const { data: adminData, error: adminError } = await client
+            .from('admins')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        console.log('signInAdmin - admins table lookup result (adminData):', adminData);
+        console.log('signInAdmin - adminError:', adminError);
+
+        if (adminError && adminError.code !== 'PGRST116') {
+            console.log('signInAdmin - throwing adminError:', adminError);
+            throw adminError;
+        }
+
+        if (!adminData) {
+            await client.auth.signOut();
+            const err = new Error('Admin not authorized');
+            console.log('signInAdmin - throwing error:', err);
+            throw err;
+        }
+
+        return adminData;
+    },
+
+    async signOutAdmin() {
+        const client = initializeSupabaseClient();
+        if (client) {
+            await client.auth.signOut();
+        }
+    },
+
+    async getZones() {
+        const client = initializeSupabaseClient();
+
+        if (!client) {
+            return ZONE_NAMES.map(name => ({ zone_name: name }));
+        }
+
+        try {
+            const { data, error } = await client
+                .from('zones')
+                .select('id, zone_name')
+                .eq('is_deleted', false)
+                .order('zone_name', { ascending: true });
+
+            if (error || !data || data.length === 0) {
+                return ZONE_NAMES.map(name => ({ zone_name: name }));
+            }
+
+            return data;
+        } catch (err) {
+            console.error('Error getting zones:', err);
+            return ZONE_NAMES.map(name => ({ zone_name: name }));
+        }
+    },
+
+    async validateZonePassword(zoneName, password) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { data, error } = await client.rpc('validate_zone_password', {
+            zone_name: zoneName,
+            password: password
+        });
+
+        if (error) throw error;
+        return data === true;
+    },
+
+    async getSchoolsByZone(zoneName) {
+        const client = initializeSupabaseClient();
+        if (!client) return [];
+
+        try {
+            const zone = await this._getZoneByName(zoneName);
+            if (!zone) return [];
+
+            const { data, error } = await client
+                .from('schools')
+                .select('id, school_name, school_code')
+                .eq('zone_id', zone.id)
+                .eq('is_deleted', false)
+                .order('school_name', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+        } catch (err) {
+            console.error('Error getting schools:', err);
+            return [];
+        }
+    },
+
+    async _getZoneByName(zoneName) {
+        const client = initializeSupabaseClient();
+        const { data, error } = await client
+            .from('zones')
+            .select('id, zone_name')
+            .eq('zone_name', zoneName)
+            .eq('is_deleted', false)
+            .single();
+
+        if (error) return null;
+        return data;
+    },
+
+    async addSchool(zoneName, schoolName) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const zone = await this._getZoneByName(zoneName);
+        if (!zone) throw new Error('Zone not found');
+
+        const schoolCode = schoolName.slice(0, 30).toUpperCase().replace(/\s+/g, '_');
+
+        const { data, error } = await client
+            .from('schools')
+            .insert([{
+                zone_id: zone.id,
+                school_name: schoolName,
+                school_code: schoolCode
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getAllLearnersWithDetails() {
+        const client = initializeSupabaseClient();
+        if (!client) return [];
+
+        try {
+            const { data, error } = await client
+                .from('learners')
+                .select(`
+                    id,
+                    full_name,
+                    lin,
+                    sex,
+                    class,
+                    school_id,
+                    schools (
+                        id,
+                        school_name,
+                        zone_id,
+                        zones (
+                            zone_name
+                        )
+                    )
+                `)
+                .eq('is_deleted', false)
+                .order('full_name', { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map(learner => ({
+                id: learner.id,
+                name: learner.full_name,
+                lin: learner.lin,
+                sex: learner.sex,
+                class: learner.class,
+                school_id: learner.school_id,
+                school_name: learner.schools?.school_name || 'Unknown',
+                zone_name: learner.schools?.zones?.zone_name || 'Unknown'
+            }));
+        } catch (err) {
+            console.error('Error getting learners:', err);
+            return [];
+        }
+    },
+
+    async getOrCreateLearner(fullName, lin, schoolId, sex, className, zoneName) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const zone = await this._getZoneByName(zoneName);
+        if (!zone) throw new Error('Zone not found');
+
+        const { data: existing, error: findError } = await client
+            .from('learners')
+            .select('*')
+            .eq('lin', lin)
+            .eq('is_deleted', false)
+            .maybeSingle();
+
+        if (findError) throw findError;
+
+        if (existing) {
+            if (existing.full_name !== fullName) {
+                throw new Error('LIN already exists with different name');
+            }
+            return existing;
+        }
+
+        const { data, error } = await client
+            .from('learners')
+            .insert([{
+                zone_id: zone.id,
+                school_id: schoolId,
+                full_name: fullName,
+                lin: lin,
+                sex: sex,
+                class: className
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteLearner(learnerId) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { error } = await client
+            .from('learners')
+            .update({ is_deleted: true, updated_at: new Date().toISOString() })
+            .eq('id', learnerId);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async saveResults(learnerId, schoolId, className, year, term, subjectScores, summaryData, zoneName) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const zone = await this._getZoneByName(zoneName);
+        if (!zone) throw new Error('Zone not found');
+
+        const termNum = parseTerm(term);
+        if (!termNum) throw new Error('Invalid term');
+
+        const { data: existingResult, error: findError } = await client
+            .from('results')
+            .select('id')
+            .eq('learner_id', learnerId)
+            .eq('year', parseInt(year, 10))
+            .eq('term', termNum)
+            .eq('is_deleted', false)
+            .maybeSingle();
+
+        if (findError) throw findError;
+
+        let resultId;
+
+        if (existingResult) {
+            const { data, error } = await client
+                .from('results')
+                .update({
+                    class: className,
+                    overall_position: summaryData.position || 'N/A',
+                    overall_comment: summaryData.overallComment || '',
+                    subject_teacher_comment: summaryData.subjectTeacherComment || '',
+                    head_teacher_comment: summaryData.headTeacherComment || '',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existingResult.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            resultId = data.id;
+
+            await client.from('result_subjects').delete().eq('result_id', resultId);
+        } else {
+            const { data, error } = await client
+                .from('results')
+                .insert([{
+                    learner_id: learnerId,
+                    zone_id: zone.id,
+                    school_id: schoolId,
+                    year: parseInt(year, 10),
+                    term: termNum,
+                    class: className,
+                    overall_position: summaryData.position || 'N/A',
+                    overall_comment: summaryData.overallComment || '',
+                    subject_teacher_comment: summaryData.subjectTeacherComment || '',
+                    head_teacher_comment: summaryData.headTeacherComment || ''
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            resultId = data.id;
+        }
+
+        const subjectRows = Object.entries(subjectScores).map(([subject, score]) => ({
+            result_id: resultId,
+            subject_name: subject,
+            exam_mark: Number(score.exam || 0),
+            grade: calculateGrade(Number(score.exam || 0)),
+            remarks: score.remarks || ''
+        }));
+
+        const { error: subjectError } = await client
+            .from('result_subjects')
+            .insert(subjectRows);
+
+        if (subjectError) throw subjectError;
+
+        return { id: resultId };
+    },
+
+    async findReportCard(zoneName, schoolId, className, lin, year, term) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const termNum = parseTerm(term);
+        if (!termNum) throw new Error('Invalid term');
+
+        const { data, error } = await client.rpc('fetch_report_card', {
+            p_zone_name: zoneName,
+            p_school_id: schoolId,
+            p_class: className,
+            p_lin: lin,
+            p_year: parseInt(year, 10),
+            p_term: termNum
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getResultForEditing(resultId) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { data, error } = await client
+            .from('results')
+            .select(`
+                *,
+                result_subjects (*)
+            `)
+            .eq('id', resultId)
+            .eq('is_deleted', false)
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    // Super Admin Functions
+    async getAllAdmins() {
+        const client = initializeSupabaseClient();
+        if (!client) return [];
+
+        try {
+            const { data, error } = await client
+                .from('admins')
+                .select('*')
+                .order('full_name', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+        } catch (err) {
+            console.error('Error getting admins:', err);
+            return [];
+        }
+    },
+
+    async addAdmin(email, fullName, role = 'admin') {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { data, error } = await client
+            .from('admins')
+            .insert([{
+                email,
+                full_name: fullName,
+                role
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateAdmin(adminId, updates) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { data, error } = await client
+            .from('admins')
+            .update(updates)
+            .eq('id', adminId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteAdmin(adminId) {
+        const client = initializeSupabaseClient();
+        if (!client) throw new Error('Supabase not configured');
+
+        const { error } = await client
+            .from('admins')
+            .delete()
+            .eq('id', adminId);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async getAuditLogs() {
+        const client = initializeSupabaseClient();
+        if (!client) return [];
+
+        try {
+            const { data, error } = await client
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        } catch (err) {
+            console.error('Error getting audit logs:', err);
+            return [];
+        }
     }
-
-    return adminData;
-  },
-
-  /**
-   * Sign out admin
-   */
-  async signOutAdmin() {
-    const client = initializeSupabaseClient();
-    if (client) {
-      await client.auth.signOut();
-    }
-  },
-
-  /**
-   * Get all zones
-   */
-  async getZones() {
-    const client = initializeSupabaseClient();
-
-    if (!client) {
-      return ZONE_NAMES.map(name => ({ name }));
-    }
-
-    try {
-      const { data, error } = await client
-        .from('zones')
-        .select('name')
-        .order('name', { ascending: true });
-
-      if (error || !data || data.length === 0) {
-        return ZONE_NAMES.map(name => ({ name }));
-      }
-
-      return data.map(z => ({ name: z.name }));
-    } catch (err) {
-      console.warn('Failed to load zones from Supabase:', err);
-      return ZONE_NAMES.map(name => ({ name }));
-    }
-  },
-
-  /**
-   * Validate zone password
-   */
-  async validateZonePassword(zoneName, password) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-    if (!zoneName || !password) return false;
-
-    const { data, error } = await client.rpc('validate_zone_password', {
-      zone_name: normalizeText(zoneName),
-      candidate_password: password
-    });
-
-    if (error) throw error;
-    return data === true;
-  },
-
-  /**
-   * Get schools by zone
-   */
-  async getSchoolsByZone(zoneName) {
-    const client = initializeSupabaseClient();
-    if (!client) return [];
-
-    try {
-      const zone = await getZoneByName(zoneName);
-      if (!zone) return [];
-
-      const { data, error } = await client
-        .from('schools')
-        .select('id,name')
-        .eq('zone_id', zone.id)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error getting schools by zone:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Add a school
-   */
-  async addSchool(zoneName, schoolName) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const zone = await getZoneByName(zoneName);
-    if (!zone) throw new Error('Zone not found.');
-
-    const normalizedSchoolName = normalizeText(schoolName);
-    if (!normalizedSchoolName) throw new Error('School name is required.');
-
-    // Check for duplicates
-    const { data: duplicate, error: duplicateError } = await client
-      .from('schools')
-      .select('id')
-      .eq('zone_id', zone.id)
-      .ilike('name', normalizedSchoolName)
-      .limit(1);
-
-    if (duplicateError) throw duplicateError;
-    if (duplicate?.length > 0) throw new Error('School already exists in this zone.');
-
-    const code = normalizedSchoolName.slice(0, 30).replace(/\s+/g, '_').toUpperCase();
-    const { data, error } = await client
-      .from('schools')
-      .insert([{ zone_id: zone.id, name: normalizedSchoolName, code }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  /**
-   * Get or create learner (with duplicate prevention)
-   */
-  async getOrCreateLearner(name, lin, schoolId, gender, dateOfBirth) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const cleanName = normalizeText(name);
-    const cleanLin = normalizeText(lin);
-    const parsed = parseFullName(cleanName);
-
-    if (!schoolId) throw new Error('Target school selection is invalid.');
-    if (!parsed.first_name || !parsed.last_name) throw new Error('Learner first and last names are required.');
-    if (!/^\d{16}$/.test(cleanLin)) throw new Error('LIN must be exactly 16 digits.');
-    if (!['M', 'F'].includes(gender)) throw new Error('Gender must be M or F.');
-    if (!dateOfBirth) throw new Error('Date of birth is required.');
-
-    // Check for existing learner
-    const { data: existing, error: findError } = await client
-      .from('learners')
-      .select('*')
-      .eq('lin', cleanLin)
-      .eq('is_deleted', false)
-      .limit(1);
-
-    if (findError) throw findError;
-
-    if (existing?.length > 0) {
-      const learner = existing[0];
-      const existingName = `${learner.first_name} ${learner.last_name}`.trim().toLowerCase();
-      if (existingName !== cleanName.toLowerCase()) {
-        throw new Error('A learner with this LIN already exists with a different name.');
-      }
-      return learner;
-    }
-
-    // Create new learner
-    const { data, error } = await client
-      .from('learners')
-      .insert([{
-        school_id: schoolId,
-        lin: cleanLin,
-        first_name: parsed.first_name,
-        last_name: parsed.last_name,
-        gender,
-        date_of_birth: dateOfBirth,
-        is_deleted: false
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  /**
-   * Save or update results
-   */
-  async saveResults(learnerId, className, year, term, subjectScores, summaryData) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const subjectRows = Object.entries(subjectScores).map(([subject, score]) => ({
-      subject_name: subject,
-      ca_mark: 0,
-      exam_mark: Number(score.exam || 0),
-      mark: Number(score.exam || 0),
-      grade: score.grade || 'F',
-      remarks: score.remarks || ''
-    }));
-
-    const totalMark = subjectRows.reduce((acc, row) => acc + row.mark, 0);
-    const averageMark = subjectRows.length ? Number((totalMark / subjectRows.length).toFixed(2)) : 0;
-    const overallGrade = computeGradeFromAverage(averageMark);
-    const academicYear = `${parseInt(year, 10)}/${parseInt(year, 10) + 1}`;
-    const validTerm = ensureValidTerm(term);
-
-    // Check for existing result
-    const { data: existing, error: existingError } = await client
-      .from('results')
-      .select('id')
-      .eq('learner_id', learnerId)
-      .eq('class_name', className)
-      .eq('year', parseInt(year, 10))
-      .eq('term', validTerm)
-      .eq('is_deleted', false)
-      .limit(1);
-
-    if (existingError) throw existingError;
-
-    let resultRow;
-    if (existing?.length > 0) {
-      // Update existing result
-      const { data, error } = await client
-        .from('results')
-        .update({
-          total_mark: totalMark,
-          average_mark: averageMark,
-          grade: overallGrade,
-          academic_year: academicYear,
-          summary_data: summaryData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing[0].id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultRow = data;
-
-      // Delete old subject records
-      await client.from('result_subjects').delete().eq('result_id', resultRow.id);
-    } else {
-      // Create new result
-      const { data, error } = await client
-        .from('results')
-        .insert([{
-          learner_id: learnerId,
-          class_name: className,
-          year: parseInt(year, 10),
-          term: validTerm,
-          academic_year: academicYear,
-          total_mark: totalMark,
-          average_mark: averageMark,
-          grade: overallGrade,
-          summary_data: summaryData,
-          is_deleted: false
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultRow = data;
-    }
-
-    if (!resultRow || !resultRow.id) {
-      throw new Error('Unable to save results.');
-    }
-
-    // Insert subject records
-    const { error: subjectError } = await client
-      .from('result_subjects')
-      .insert(subjectRows.map(subject => ({ ...subject, result_id: resultRow.id })));
-
-    if (subjectError) throw subjectError;
-
-    return resultRow;
-  },
-
-  /**
-   * Get all learners with zone and school details
-   */
-  async getAllLearnersWithDetails() {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const { data, error } = await client
-      .from('learners')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        lin,
-        school_id,
-        schools(id, name, zone_id, zones(name))
-      `)
-      .eq('is_deleted', false)
-      .order('first_name', { ascending: true });
-
-    if (error) throw error;
-
-    return data.map(learner => ({
-      id: learner.id,
-      name: `${learner.first_name} ${learner.last_name}`.trim(),
-      lin: learner.lin,
-      zone_name: learner.schools?.zones?.name || 'Unknown',
-      school_id: learner.school_id,
-      school_name: learner.schools?.name || 'Unknown'
-    }));
-  },
-
-  /**
-   * Soft delete a learner
-   */
-  async deleteLearner(learnerId) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    // Soft delete learner
-    const { error } = await client
-      .from('learners')
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString()
-      })
-      .eq('id', learnerId);
-
-    if (error) throw error;
-
-    // Soft delete all associated results
-    await client
-      .from('results')
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString()
-      })
-      .eq('learner_id', learnerId);
-
-    return true;
-  },
-
-  /**
-   * Get learner results history
-   */
-  async getLearnerResultsHistory(learnerId) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const { data, error } = await client
-      .from('results')
-      .select('*')
-      .eq('learner_id', learnerId)
-      .eq('is_deleted', false)
-      .order('year', { ascending: false })
-      .order('term', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  /**
-   * Soft delete a result record
-   */
-  async deleteResultRecord(resultId) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const { error } = await client
-      .from('results')
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString()
-      })
-      .eq('id', resultId);
-
-    if (error) throw error;
-    return true;
-  },
-
-  /**
-   * Check Supabase connection
-   */
-  async checkSupabaseConnection() {
-    const client = initializeSupabaseClient();
-    if (!client) return false;
-
-    try {
-      const { data, error } = await client.from('zones').select('id').limit(1);
-      if (error) {
-        console.warn('Supabase connection check failed', error);
-        return false;
-      }
-      return Array.isArray(data);
-    } catch (err) {
-      console.error('Supabase connection check exception', err);
-      return false;
-    }
-  },
-
-  /**
-   * Find report card
-   */
-  async findReportCard(zoneName, schoolId, className, lin, year, term) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const normalizedZone = normalizeText(zoneName);
-    const normalizedClassName = normalizeText(className);
-    const normalizedLin = normalizeText(lin).replace(/\D/g, '');
-    const parsedYear = parseInt(year, 10);
-    const validTerm = ensureValidTerm(term);
-
-    if (!normalizedZone || !schoolId || !normalizedClassName || !normalizedLin || normalizedLin.length !== 16 || !Number.isInteger(parsedYear)) {
-      throw new Error('Invalid search parameters provided');
-    }
-
-    console.debug('findReportCard: search parameters', {
-      zone_name: normalizedZone,
-      school_id: schoolId,
-      class_name: normalizedClassName,
-      lin: normalizedLin,
-      year: parsedYear,
-      term: validTerm
-    });
-
-    // Use direct query path for maximum reliability and transparency
-    // RPC can fail with non-JSON responses and obscure errors; direct queries are safer
-
-    const { data: learner, error: learnerError, count: learnerCount } = await client
-      .from('learners')
-      .select('id, first_name, last_name, lin, school_id', { count: 'exact' })
-      .eq('lin', normalizedLin)
-      .eq('is_deleted', false)
-      .maybeSingle();
-
-    console.debug('findReportCard: learner lookup', {
-      lin: normalizedLin,
-      schoolId,
-      found: !!learner,
-      learnerCount,
-      error: learnerError
-    });
-
-    if (learnerError) {
-      throw learnerError;
-    }
-    if (!learner) {
-      return null;
-    }
-
-    const { data: school, error: schoolError } = await client
-      .from('schools')
-      .select('id, name, zone_id')
-      .eq('id', schoolId)
-      .maybeSingle();
-
-    console.debug('findReportCard: school lookup', {
-      schoolId,
-      found: !!school,
-      error: schoolError
-    });
-
-    if (schoolError) {
-      throw schoolError;
-    }
-    if (!school) {
-      return null;
-    }
-
-    const { data: zone, error: zoneError } = await client
-      .from('zones')
-      .select('name')
-      .eq('id', school.zone_id)
-      .maybeSingle();
-
-    console.debug('findReportCard: zone lookup', {
-      zoneId: school.zone_id,
-      expectedZone: normalizedZone,
-      found: zone?.name,
-      error: zoneError
-    });
-
-    if (zoneError) {
-      throw zoneError;
-    }
-    if (!zone) {
-      return null;
-    }
-
-    if (zone.name.toUpperCase() !== normalizedZone.toUpperCase()) {
-      console.warn('findReportCard: zone mismatch between selected school and chosen zone', {
-        selectedZone: normalizedZone,
-        schoolZone: zone.name
-      });
-      return null;
-    }
-
-    const { data: result, error: resultError, count: resultCount } = await client
-      .from('results')
-      .select('id, class_name, year, term, summary_data, result_subjects(*)', { count: 'exact' })
-      .eq('learner_id', learner.id)
-      .eq('class_name', normalizedClassName)
-      .eq('year', parsedYear)
-      .eq('term', validTerm)
-      .eq('is_deleted', false)
-      .maybeSingle();
-
-    console.debug('findReportCard: result lookup', {
-      learnerId: learner.id,
-      className: normalizedClassName,
-      year: parsedYear,
-      term: validTerm,
-      found: !!result,
-      resultCount,
-      error: resultError
-    });
-
-    if (resultError) {
-      throw resultError;
-    }
-    if (!result) {
-      return null;
-    }
-
-    const subjectScores = (result.result_subjects || []).reduce((acc, subjectRow) => {
-      acc[subjectRow.subject_name] = {
-        ca: subjectRow.ca_mark,
-        exam: subjectRow.exam_mark,
-        total: subjectRow.mark,
-        grade: subjectRow.grade,
-        remarks: subjectRow.remarks || ''
-      };
-      return acc;
-    }, {});
-
-    return {
-      school: school.name,
-      zone: zone.name,
-      learnerName: `${learner.first_name} ${learner.last_name}`.trim(),
-      lin: learner.lin,
-      class: result.class_name,
-      year: result.year,
-      term: result.term,
-      subjectScores,
-      summaryData: result.summary_data || {}
-    };
-  },
-
-  /**
-   * Get specific result for editing
-   */
-  async getResultForEditing(resultId) {
-    const client = initializeSupabaseClient();
-    if (!client) throw new Error('Supabase is not configured.');
-
-    const { data, error } = await client
-      .from('results')
-      .select(`
-        *,
-        result_subjects(*)
-      `)
-      .eq('id', resultId)
-      .eq('is_deleted', false)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
 };
 
-// Export for global access
 window.EduTrackDB = EduTrackDB;
 
-// Initialize database when DOM is ready
+// Initialize on load
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeDatabase);
+    document.addEventListener('DOMContentLoaded', initializeSupabaseClient);
 } else {
-  initializeDatabase();
+    initializeSupabaseClient();
 }
-

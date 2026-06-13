@@ -3,6 +3,7 @@
 // App State Management
 const State = {
   activeAdmin: false,
+  adminData: null, // Stores { id, email, full_name, role
   adminZone: null,
   allZones: [],
   selectedLearnerForNewResult: null,
@@ -147,8 +148,8 @@ async function loadZones() {
     
     zones.forEach(zone => {
       const opt = document.createElement("option");
-      opt.value = zone.name;
-      opt.textContent = zone.name;
+      opt.value = zone.zone_name;
+      opt.textContent = zone.zone_name;
       userSelect.appendChild(opt);
     });
 
@@ -166,8 +167,8 @@ function renderAdminZonesList(zones) {
   
   zones.forEach(zone => {
     const opt = document.createElement("option");
-    opt.value = zone.name;
-    opt.textContent = zone.name;
+    opt.value = zone.zone_name;
+    opt.textContent = zone.zone_name;
     dropdown.appendChild(opt);
   });
 }
@@ -177,7 +178,7 @@ function renderAdminZonesList(zones) {
  */
 function filterAdminZones() {
   const query = document.getElementById("adminZoneSearchInput").value.toUpperCase();
-  const filtered = State.allZones.filter(z => z.name.toUpperCase().includes(query));
+  const filtered = State.allZones.filter(z => z.zone_name.toUpperCase().includes(query));
   renderAdminZonesList(filtered);
 }
 
@@ -207,7 +208,7 @@ async function handleUserZoneChange() {
       schools.forEach(school => {
         const opt = document.createElement("option");
         opt.value = school.id;
-        opt.textContent = school.name;
+        opt.textContent = school.school_name;
         schoolSelect.appendChild(opt);
       });
       schoolSelect.disabled = false;
@@ -236,7 +237,8 @@ async function handleAdminLogin(event) {
   }
 
   try {
-    await EduTrackDB.signInAdmin(email, password);
+    const adminData = await EduTrackDB.signInAdmin(email, password);
+    State.adminData = adminData; // Store admin data including role
     closeModal("adminLoginModal");
     openModal("adminZoneSelectModal");
   } catch (error) {
@@ -300,6 +302,12 @@ function activateAdminDashboard() {
   document.getElementById("exitAdminBtn").style.display = "inline-block";
   document.getElementById("supabaseStatusBadge").style.display = "inline-flex";
   
+  // Check if user is super admin to show/hide super admin tabs
+  if (State.adminData && State.adminData.role === 'super_admin') {
+    document.getElementById("manageAdminsTabBtn").style.display = "inline-block";
+    document.getElementById("auditLogsTabBtn").style.display = "inline-block";
+  }
+  
   // Hide normal user search interface, show dashboard panel
   document.getElementById("userPortalSection").style.display = "none";
   document.getElementById("adminPortalSection").style.display = "block";
@@ -325,7 +333,7 @@ async function updateSupabaseStatus() {
   statusIndicator.style.backgroundColor = '#cccccc';
 
   try {
-    const connected = await EduTrackDB.checkSupabaseConnection();
+    const connected = await EduTrackDB.checkConnection();
     if (connected) {
       statusText.textContent = '🟢 SUPABASE CONNECTED';
       statusIndicator.style.backgroundColor = '#23b44b';
@@ -345,6 +353,7 @@ async function updateSupabaseStatus() {
  */
 function logoutAdmin() {
   State.activeAdmin = false;
+  State.adminData = null;
   State.adminZone = null;
   
   document.getElementById("adminBadge").style.display = "none";
@@ -386,6 +395,85 @@ function switchAdminTab(tabId) {
   } else if (tabId === "manageSchoolsTab") {
     buttons[2].classList.add("active");
     loadAdminSchools();
+  } else if (tabId === "manageAdminsTab") {
+    buttons[3].classList.add("active");
+    loadAllAdmins();
+  } else if (tabId === "auditLogsTab") {
+    buttons[4].classList.add("active");
+    loadAuditLogs();
+  }
+}
+
+async function loadAllAdmins() {
+  if (!State.adminData || State.adminData.role !== 'super_admin') return;
+  try {
+    const admins = await EduTrackDB.getAllAdmins();
+    const tbody = document.getElementById("adminsTableBody");
+    tbody.innerHTML = "";
+    admins.forEach(admin => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${admin.full_name || 'N/A'}</strong></td>
+        <td>${admin.email}</td>
+        <td><span style="font-size: 0.85rem; background: rgba(0,0,0,0.15); padding: 2px 6px; border-radius: 4px;">${admin.role || 'admin'}</span></td>
+        <td>
+          <button class="action-badge badge-delete" onclick="handleDeleteAdmin('${admin.id}')" ${admin.id === State.adminData.id ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Error loading admins:", error);
+  }
+}
+
+async function handleAddAdmin(event) {
+  event.preventDefault();
+  const email = document.getElementById("newAdminEmail").value.trim();
+  const name = document.getElementById("newAdminName").value.trim();
+  const role = document.getElementById("newAdminRole").value;
+
+  try {
+    await EduTrackDB.addAdmin(email, name, role);
+    showMessage("Success", "Admin added successfully!");
+    document.getElementById("addAdminForm").reset();
+    loadAllAdmins();
+  } catch (error) {
+    console.error("Error adding admin:", error);
+    showMessage("Error", error.message || "Failed to add admin");
+  }
+}
+
+async function handleDeleteAdmin(adminId) {
+  if (!confirm("Are you sure you want to delete this admin?")) return;
+  try {
+    await EduTrackDB.deleteAdmin(adminId);
+    showMessage("Success", "Admin deleted successfully!");
+    loadAllAdmins();
+  } catch (error) {
+    console.error("Error deleting admin:", error);
+    showMessage("Error", error.message || "Failed to delete admin");
+  }
+}
+
+async function loadAuditLogs() {
+  if (!State.adminData || State.adminData.role !== 'super_admin') return;
+  try {
+    const logs = await EduTrackDB.getAuditLogs();
+    const tbody = document.getElementById("auditLogsTableBody");
+    tbody.innerHTML = "";
+    logs.forEach(log => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${log.action}</strong></td>
+        <td>${log.table_name || 'N/A'}</td>
+        <td>${new Date(log.created_at).toLocaleString()}</td>
+        <td>${JSON.stringify(log.new_data || {})}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Error loading audit logs:", error);
   }
 }
 
@@ -411,14 +499,14 @@ async function loadAdminSchools() {
     schools.forEach(school => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><strong>${school.name}</strong></td>
+        <td><strong>${school.school_name}</strong></td>
         <td><span style="color: var(--malawi-green); font-weight: 600;">${State.adminZone}</span></td>
       `;
       tbody.appendChild(tr);
 
       const opt = document.createElement("option");
       opt.value = school.id;
-      opt.textContent = school.name;
+      opt.textContent = school.school_name;
       wizardSchoolSelect.appendChild(opt);
     });
   } catch (error) {
@@ -747,7 +835,6 @@ async function uploadAndSaveReportCard() {
   const year = document.getElementById("adminYearSelect").value;
   const termString = document.getElementById("adminTermSelect").value;
   const gender = document.getElementById("adminLearnerGender").value;
-  const dateOfBirth = document.getElementById("adminLearnerDob").value;
 
   if (!State.adminZone) {
     showMessage("Invalid Zone", "Please authorize a valid administration zone before saving.");
@@ -769,8 +856,8 @@ async function uploadAndSaveReportCard() {
     return;
   }
 
-  if (!gender || !dateOfBirth) {
-    showMessage("Missing Information", "Please provide the learner's gender and date of birth.");
+  if (!gender) {
+    showMessage("Missing Information", "Please provide the learner's gender.");
     return;
   }
 
@@ -792,10 +879,9 @@ async function uploadAndSaveReportCard() {
   // Summary Metrics Data Compilation
   const summaryData = {
     position: document.getElementById("adminClassPosition").value.trim() || "N/A",
-    totalPupils: document.getElementById("adminTotalPupils").value.trim() || "N/A",
-    classTeacherComment: document.getElementById("adminClassTeacherComment").value.trim() || "No notes provided.",
-    headTeacherComment: document.getElementById("adminHeadTeacherComment").value.trim() || "No notes provided.",
-    promotionStatus: document.getElementById("adminPromotionStatus").value
+    overallComment: "",
+    subjectTeacherComment: document.getElementById("adminClassTeacherComment").value.trim() || "No notes provided.",
+    headTeacherComment: document.getElementById("adminHeadTeacherComment").value.trim() || "No notes provided."
   };
 
   console.debug('uploadAndSaveReportCard: saving learner and result', {
@@ -806,18 +892,17 @@ async function uploadAndSaveReportCard() {
     year,
     term,
     gender,
-    dateOfBirth,
     subjectScores,
     summaryData
   });
 
   try {
     // 1. Check/Save Student profile (Enforces duplication check rule: Same Name and LIN)
-    const student = await EduTrackDB.getOrCreateLearner(name, lin, schoolId, gender, dateOfBirth);
+    const student = await EduTrackDB.getOrCreateLearner(name, lin, schoolId, gender, className, State.adminZone);
     console.debug('uploadAndSaveReportCard: learner record returned', student);
     
     // 2. Persist student term report details
-    const result = await EduTrackDB.saveResults(student.id, className, year, term, subjectScores, summaryData);
+    const result = await EduTrackDB.saveResults(student.id, schoolId, className, year, term, subjectScores, summaryData, State.adminZone);
     console.debug('uploadAndSaveReportCard: result record saved', result);
 
     showMessage("Success", "Results Saved Successfully");
@@ -960,16 +1045,20 @@ function renderReportCardToUI(report) {
   }
 
   // Aggregate mathematics calculation
-  const maxPossible = count * 100;
+  const maxPossible = 600;
   const percentage = maxPossible > 0 ? ((aggregateTotal / maxPossible) * 100).toFixed(1) : "0.0";
 
   document.getElementById("rcTotalMarks").textContent = `${aggregateTotal} / ${maxPossible}`;
   document.getElementById("rcMeanPercentage").textContent = `${percentage}%`;
-  document.getElementById("rcPosition").textContent = `${report.summaryData.position} of ${report.summaryData.totalPupils}`;
-  document.getElementById("rcPromotion").textContent = report.summaryData.promotionStatus;
+  if (report.overallPosition && report.totalLearners) {
+    document.getElementById("rcPosition").textContent = `${report.overallPosition} OF ${report.totalLearners}`;
+  } else {
+    document.getElementById("rcPosition").textContent = report.overallPosition || "N/A";
+  }
+  document.getElementById("rcPromotion").textContent = report.overallGradeLevel || "N/A";
 
-  document.getElementById("rcClassTeacherComment").textContent = report.summaryData.classTeacherComment;
-  document.getElementById("rcHeadTeacherComment").textContent = report.summaryData.headTeacherComment;
+  document.getElementById("rcClassTeacherComment").textContent = report.subjectTeacherComment || "";
+  document.getElementById("rcHeadTeacherComment").textContent = report.headTeacherComment || "";
 
   // Toggle View panels
   document.getElementById("userPortalSection").style.display = "none";
