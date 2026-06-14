@@ -58,10 +58,19 @@ function initializeSupabaseClient() {
 // Calculate grade from mark
 function calculateGrade(mark) {
     if (mark >= 80) return 'A';
-    if (mark >= 70) return 'B';
-    if (mark >= 60) return 'C';
-    if (mark >= 50) return 'D';
+    if (mark >= 65) return 'B';
+    if (mark >= 55) return 'C';
+    if (mark >= 40) return 'D';
     return 'F';
+}
+
+// Calculate remark from mark
+function calculateRemark(mark) {
+    if (mark >= 80) return 'EXCELLENT';
+    if (mark >= 65) return 'VERY GOOD';
+    if (mark >= 55) return 'GOOD';
+    if (mark >= 40) return 'AVERAGE';
+    return 'FAIL';
 }
 
 // Parse term string to number

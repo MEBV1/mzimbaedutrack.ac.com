@@ -740,6 +740,7 @@ function calculateRow(inputElement) {
   const tr = inputElement.closest("tr");
   const examInput = tr.querySelector(".exam-score");
   const gradeInput = tr.querySelector(".grade-score");
+  const remarksInput = tr.querySelector(".remarks-score");
 
   let exam = parseFloat(examInput.value) || 0;
 
@@ -749,14 +750,25 @@ function calculateRow(inputElement) {
     examInput.value = 100;
   }
 
-  // Compute standard Malawian performance grades
+  // Compute new grading scale
   let grade = "F";
-  if (exam >= 80) grade = "A";
-  else if (exam >= 70) grade = "B";
-  else if (exam >= 60) grade = "C";
-  else if (exam >= 50) grade = "D";
+  let remark = "FAIL";
+  if (exam >= 80) {
+    grade = "A";
+    remark = "EXCELLENT";
+  } else if (exam >= 65) {
+    grade = "B";
+    remark = "VERY GOOD";
+  } else if (exam >= 55) {
+    grade = "C";
+    remark = "GOOD";
+  } else if (exam >= 40) {
+    grade = "D";
+    remark = "AVERAGE";
+  }
 
   gradeInput.value = grade;
+  remarksInput.value = remark;
 }
 
 /**

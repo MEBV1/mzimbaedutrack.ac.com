@@ -117,9 +117,9 @@ CREATE OR REPLACE FUNCTION calculate_grade(mark NUMERIC)
 RETURNS VARCHAR(2) LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
     IF mark >= 80 THEN RETURN 'A';
-    ELSIF mark >= 70 THEN RETURN 'B';
-    ELSIF mark >= 60 THEN RETURN 'C';
-    ELSIF mark >= 50 THEN RETURN 'D';
+    ELSIF mark >= 65 THEN RETURN 'B';
+    ELSIF mark >= 55 THEN RETURN 'C';
+    ELSIF mark >= 40 THEN RETURN 'D';
     ELSE RETURN 'F';
     END IF;
 END;
